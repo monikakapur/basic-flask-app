@@ -1,0 +1,45 @@
+name: Build and Push Multi-Stage Flask Image
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/basic-flask-app
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Needed to push to GitHub Container Registry
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. Standard multi-stage build (matches Step 4 of the guide)
+      - name: Build multi-stage Docker image
+        run: docker build -t basic-flask-app:latest .
+
+      # 2. Verify the container starts and responds on port 5000
+      - name: Test container health
+        run: |
+          docker run -d --name test-flask -p 5000:5000 basic-flask-app:latest
+          sleep 3
+          curl --fail http://localhost:5000
+          docker stop test-flask
+
+      # 3. Log in to GitHub Container Registry (skipped on Pull Requests)
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # 4. Tag and push the image using standard Docker CLI
+      - name: Tag and push image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker tag basic-flask-app:latest ${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.IMAGE_NAME }}:latest
