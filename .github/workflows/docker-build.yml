@@ -43,3 +43,8 @@ jobs:
         run: |
           docker tag basic-flask-app:latest ${{ env.IMAGE_NAME }}:latest
           docker push ${{ env.IMAGE_NAME }}:latest
+
+       # 5. Log out of GitHub Container Registry (runs even if push fails)
+      - name: Log out of GitHub Container Registry
+        if: always() && github.event_name != 'pull_request'
+        run: docker logout ghcr.io
